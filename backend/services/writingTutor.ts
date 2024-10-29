@@ -1,5 +1,6 @@
 // services/writingTutor.ts
 import { Anthropic } from "../deps.ts";
+import { MockAIClient } from "@/test/mockAIClient.ts";
 
 export interface FeedbackSession {
     id: string;
@@ -47,13 +48,18 @@ Provide feedback for the current sentence focusing on one key improvement opport
 `;
 
 export class WritingTutorService {
-    private anthropic: Anthropic;
+    public anthropic: Anthropic | MockAIClient;
+    private isMockClient = false;
 
-    constructor(apiKey: string) {
-        this.anthropic = new Anthropic({
-            apiKey: apiKey
-        });
+    constructor(api_key?: string) {
+        if (!api_key) {
+            this.anthropic = new MockAIClient();
+            this.isMockClient = true;
+        } else {
+            this.anthropic = new Anthropic({ apiKey: api_key });
+        }
     }
+
 
     startFeedbackSession(studentId: string, essayText: string): FeedbackSession {
         return {
@@ -69,29 +75,35 @@ export class WritingTutorService {
     async getNextFeedback(session: FeedbackSession): Promise<string> {
         const sentences = this.parseEssayIntoSentences(session.essayText);
         const currentSentence = sentences[session.currentSentenceIndex];
-
         const prompt = this.buildPrompt(session, currentSentence);
+
         try {
-            const response = await this.anthropic.messages.create({
-                model: "claude-3-5-sonnet-20241022",
-                max_tokens: 4096,
-                temperature: 0.5,
-                system: prompt,
-                messages: [
-                    {
-                        role: "user",
-                        content: "Please provide feedback on the current sentence."
+            let feedback: string;
+
+            if (this.isMockClient) {
+                const response = await (this.anthropic as MockAIClient).messages.create.call();
+                feedback = response.content[0].text;
+            } else {
+                const response = await (this.anthropic as Anthropic).messages.create({
+                    model: "claude-3-5-sonnet-20241022",
+                    max_tokens: 4096,
+                    temperature: 0.5,
+                    system: prompt,
+                    messages: [
+                        {
+                            role: "user",
+                            content: "Please provide feedback on the current sentence."
+                        }
+                    ]
+                });
+
+                feedback = response.content.reduce((acc, block) => {
+                    if ('text' in block) {
+                        return acc + block.text;
                     }
-                ]
-            });
-
-
-            const feedback = response.content.reduce((acc, block) => {
-                if ('text' in block) {
-                    return acc + block.text;
-                }
-                return acc;
-            }, '');
+                    return acc;
+                }, '');
+            }
 
             // Update session history
             session.feedbackHistory.push({
@@ -103,7 +115,6 @@ export class WritingTutorService {
             return feedback;
 
         } catch (error) {
-            console.error('Error getting feedback from Claude:', error);
             throw new Error('Failed to generate feedback');
         }
     }
@@ -169,32 +180,38 @@ export class WritingTutorService {
     Please provide a helpful reply to the student's response. Keep the conversation focused on improving their writing. Be encouraging and specific in your guidance.`;
 
         try {
-            const response = await this.anthropic.messages.create({
-                model: "claude-3-5-sonnet-20241022",
-                max_tokens: 4096,
-                temperature: 0.5,
-                messages: [
-                    {
-                        role: "user",
-                        content: prompt
+            let reply: string;
+
+            if (this.isMockClient) {
+                const response = await (this.anthropic as MockAIClient).messages.create.call();
+                reply = response.content[0].text;
+            } else {
+                const response = await (this.anthropic as Anthropic).messages.create({
+                    model: "claude-3-5-sonnet-20241022",
+                    max_tokens: 4096,
+                    temperature: 0.5,
+                    messages: [
+                        {
+                            role: "user",
+                            content: prompt
+                        }
+                    ]
+                });
+
+                reply = response.content.reduce((acc, block) => {
+                    if ('text' in block) {
+                        return acc + block.text;
                     }
-                ]
-            });
+                    return acc;
+                }, '');
+            }
 
-            const reply = response.content.reduce((acc, block) => {
-                if ('text' in block) {
-                    return acc + block.text;
-                }
-                return acc;
-            }, '');
-
-            // Update the current interaction with the student's response and bot's reply
+            // Update the current interaction
             currentInteraction.studentResponse = studentResponse;
             currentInteraction.botReplyToResponse = reply;
 
             return reply;
         } catch (error) {
-            console.error('Error getting response from Claude:', error);
             throw new Error('Failed to generate response');
         }
     }
