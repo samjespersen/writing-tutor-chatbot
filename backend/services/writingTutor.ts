@@ -1,5 +1,4 @@
-// services/writingTutor.ts
-import { Anthropic } from "../deps.ts";
+import { Anthropic } from "@/deps.ts";
 import { MockAIClient } from "@/test/mockAIClient.ts";
 
 export interface FeedbackSession {
@@ -114,7 +113,7 @@ export class WritingTutorService {
 
             return feedback;
 
-        } catch (error) {
+        } catch (_error) {
             throw new Error('Failed to generate feedback');
         }
     }
@@ -211,7 +210,7 @@ export class WritingTutorService {
             currentInteraction.botReplyToResponse = reply;
 
             return reply;
-        } catch (error) {
+        } catch (_error) {
             throw new Error('Failed to generate response');
         }
     }

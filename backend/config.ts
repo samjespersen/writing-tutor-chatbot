@@ -1,5 +1,5 @@
 // config.ts
-import { load } from "./deps.ts";
+import { load } from "@/deps.ts";
 
 interface Config {
   PORT: number;

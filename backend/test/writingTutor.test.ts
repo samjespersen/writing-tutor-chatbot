@@ -1,7 +1,6 @@
 import { describe, it, expect, use, chaiAsPromised } from '@/deps.ts';
 import { WritingTutorService } from "@/services/writingTutor.ts";
 import { MockAIClient } from "@/test/mockAIClient.ts";
-import { spy } from "npm:sinon";
 
 use(chaiAsPromised);
 

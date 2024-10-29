@@ -24,6 +24,7 @@ export class MockAIClient implements AIClient {
         this.mockResponses.push({ response, isError });
     }
 
+    // deno-lint-ignore require-await
     async complete(prompt: string): Promise<string> {
         this.calls.push(prompt);
 
@@ -62,7 +63,7 @@ class MockFunction {
         this.mockResponses = [{ response: error, isError: true }];
     }
 
-    async call(...args: any[]): Promise<any> {
+    call(...args: any[]): Promise<any> {
         this.calls.push(args);
         const mockResponse = this.mockResponses[this.calls.length - 1] || this.mockResponses[0];
 
