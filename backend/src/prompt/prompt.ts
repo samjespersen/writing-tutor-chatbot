@@ -1,4 +1,4 @@
-import data from "@/prompt/Resources.json" with { type: "json" };
+import data from "./Resources.json" with { type: "json" };
 
 
 const curriculumDesignerSystemPrompt = `\
@@ -111,7 +111,7 @@ Return only an array of lesson plan objects. Do not provide any additional text 
 export const CURRICULUM_DESIGNER_USER_PROMPT = `\
 Writing sample: \n\n{{student_text}}\n\n
 Student reflection: \n\n{{student_reflection}}\n\n
-Student grade: {{grade}}
+Student grade: {{student_grade}}
 `
 type Resource = {
     name: string;

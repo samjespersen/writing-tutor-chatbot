@@ -1,6 +1,6 @@
 import { Anthropic } from "@/deps.ts";
-import { MockAIClient } from "@/test/mockAIClient.ts";
-import { WRITING_TUTOR_PROMPT } from "@/prompt/prompt.ts";
+import { MockAIClient } from "../test/mockAIClient.ts";
+import { WRITING_TUTOR_PROMPT } from "@/src/prompt/prompt.ts";
 
 // Interface defining the structure of a feedback session between student and tutor
 export interface FeedbackSession {

@@ -1,8 +1,8 @@
-import { Anthropic, Application, Router } from "../backend/deps.ts";
-import { CONFIG } from "@/config.ts";
+import { Anthropic, Application, Router } from "../deps.ts";
+import { CONFIG } from "./config.ts";
 import { WritingTutorService, type FeedbackSession } from "./services/writingTutor.ts";
-import type { Context, RouterContext } from "../backend/deps.ts";
-import { LessonPlanner } from "@/services/lessonPlanner.ts";
+import type { Context, RouterContext } from "../deps.ts";
+import { LessonPlanner } from "./services/lessonPlanner.ts";
 
 const app = new Application();
 const router = new Router();
@@ -14,6 +14,20 @@ const anthropicClient = new Anthropic({
 
 const tutorService = new WritingTutorService(anthropicClient);
 const lessonPlanner = new LessonPlanner(anthropicClient);
+
+// Enable CORS
+app.use(async (ctx, next) => {
+    ctx.response.headers.set("Access-Control-Allow-Origin", "*");
+    ctx.response.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+    ctx.response.headers.set("Access-Control-Allow-Headers", "Content-Type");
+
+    if (ctx.request.method === "OPTIONS") {
+        ctx.response.status = 204;
+        return;
+    }
+
+    await next();
+});
 
 // Add request logging middleware
 app.use(async (ctx, next) => {
@@ -140,11 +154,11 @@ router.post("/api/sessions/:sessionId/respond", async (ctx: RouterContext<"/api/
 
 router.post("/api/lesson_planner", async (ctx: RouterContext<"/api/lesson_planner">) => {
     const body = await ctx.request.body().value;
-    const { student_text, student_reflection, grade } = body;
+    const { student_text, student_reflection, student_grade } = body;
     console.log(body)
-    const curriculum = await lessonPlanner.generateCurriculum({ student_text, student_reflection, grade });
+    const curriculum = await lessonPlanner.generateCurriculum({ student_text, student_reflection, student_grade });
     ctx.response.status = 200;
-    ctx.response.body = JSON.parse(curriculum.content[0].text)
+    ctx.response.body = curriculum.content[0].type == "text" ? curriculum.content[0].text : "";
 });
 
 // Apply router middleware

@@ -1,6 +1,6 @@
 import { Anthropic } from "npm:@anthropic-ai/sdk";
-import { CURRICULUM_DESIGNER_SYSTEM_PROMPT, CURRICULUM_DESIGNER_USER_PROMPT } from "@/prompt/prompt.ts";
-import { MockAIClient } from "@/test/mockAIClient.ts";
+import { CURRICULUM_DESIGNER_SYSTEM_PROMPT, CURRICULUM_DESIGNER_USER_PROMPT } from "@/src/prompt/prompt.ts";
+import { MockAIClient } from "@/src/test/mockAIClient.ts";
 
 export class LessonPlanner {
     public anthropic: Anthropic | MockAIClient;
@@ -18,14 +18,16 @@ export class LessonPlanner {
     async generateCurriculum(params: {
         student_text: string;
         student_reflection: string;
-        grade: number;
+        student_grade: number;
     }) {
+        console.log(params);
         const userPrompt = CURRICULUM_DESIGNER_USER_PROMPT
             .replace("{{student_text}}", params.student_text)
             .replace("{{student_reflection}}", params.student_reflection)
-            .replace("{{grade}}", params.grade.toString());
+            .replace("{{student_grade}}", params.student_grade.toString());
 
         const response: Anthropic.Message = await this.anthropic.beta.promptCaching.messages.create({
+            // @ts-ignore
             system: CURRICULUM_DESIGNER_SYSTEM_PROMPT,
             messages: [{ role: "user", content: userPrompt }],
             model: "claude-3-5-sonnet-20241022",
