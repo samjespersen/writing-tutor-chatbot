@@ -21,13 +21,23 @@ function App() {
             });
 
             const data = await response.json();
-            console.log(data)
-            setResult(data);
+            const res = JSON.parse(data.text);
+            setResult(res);
+
         } catch (error) {
             console.error("Error:", error);
-            setResult({ error: "Failed to fetch data" });
+            setResult([{ error }]);
         }
     };
+
+    if (result.error) {
+        return (
+            <div style={{ padding: "20px", maxWidth: "800px", margin: "0 auto" }}>
+                <h1>Error</h1>
+                <p>{result.error}</p>
+            </div>
+        )
+    }
 
     return (
         <div style={{ padding: "20px", maxWidth: "800px", margin: "0 auto" }}>
@@ -132,6 +142,7 @@ function App() {
                 </div>
             )}
         </div>
+
     );
 }
 

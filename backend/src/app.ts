@@ -45,6 +45,30 @@ app.use(async (ctx, next) => {
 // Session management (in-memory for demo purposes)
 const sessions = new Map<string, FeedbackSession>();
 
+// JSON response validation
+app.use(async (ctx, next) => {
+    await next();
+
+    if (ctx.response.headers.get('Content-Type')?.includes('application/json')) {
+        const body = ctx.response.body;
+        try {
+            // Test if response can be properly stringified
+            const jsonString = JSON.stringify(body);
+            JSON.parse(jsonString); // Test if it can be parsed back
+        } catch (error) {
+            console.error('Invalid JSON response:', body);
+            console.error('Stringify error:', error);
+
+            // Optionally sanitize the response
+            ctx.response.body = {
+                error: 'Invalid JSON response generated',
+                originalBody: String(body)
+            };
+        }
+    }
+});
+
+
 // Middleware for error handling
 app.use(async (ctx, next) => {
     try {
@@ -64,7 +88,7 @@ router.post("/api/sessions", async (ctx: Context) => {
     const session = tutorService.startFeedbackSession(studentId, essayText);
     sessions.set(session.id, session);
 
-    ctx.response.body = JSON.stringify(session, null, 2);
+    ctx.response.body = session
 });
 
 
@@ -87,7 +111,7 @@ router.get("/api/sessions/:sessionId/feedback", async (ctx: RouterContext<string
     }
 
     const feedback = await tutorService.getNextFeedback(session);
-    ctx.response.body = JSON.stringify({ feedback }, null, 2);
+    ctx.response.body = { feedback }
 });
 
 router.post("/api/sessions/:sessionId/next", (ctx: RouterContext<string>) => {
@@ -155,10 +179,9 @@ router.post("/api/sessions/:sessionId/respond", async (ctx: RouterContext<"/api/
 router.post("/api/lesson_planner", async (ctx: RouterContext<"/api/lesson_planner">) => {
     const body = await ctx.request.body().value;
     const { student_text, student_reflection, student_grade } = body;
-    console.log(body)
     const curriculum = await lessonPlanner.generateCurriculum({ student_text, student_reflection, student_grade });
     ctx.response.status = 200;
-    ctx.response.body = curriculum.content[0].type == "text" ? curriculum.content[0].text : "";
+    ctx.response.body = { text: curriculum.content[0].type == "text" ? curriculum.content[0].text : "" }
 });
 
 // Apply router middleware

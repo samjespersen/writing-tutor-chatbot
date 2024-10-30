@@ -15,12 +15,11 @@ export class LessonPlanner {
         }
     }
 
-    async generateCurriculum(params: {
+    async generateCurriculum(params: {  
         student_text: string;
         student_reflection: string;
         student_grade: number;
     }) {
-        console.log(params);
         const userPrompt = CURRICULUM_DESIGNER_USER_PROMPT
             .replace("{{student_text}}", params.student_text)
             .replace("{{student_reflection}}", params.student_reflection)
