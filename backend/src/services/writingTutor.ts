@@ -1,3 +1,4 @@
+// deno-lint-ignore-file no-explicit-any
 import { Anthropic } from "@/deps.ts";
 import { MockAIClient } from "../test/mockAIClient.ts";
 import { WRITING_TUTOR_PROMPT } from "@/src/prompt/prompt.ts";
@@ -78,17 +79,32 @@ export class WritingTutorService {
                 const response = await (this.anthropic as MockAIClient).messages.create.call(this);
                 feedback = response.content[0].text;
             } else {
+                const messages = session.feedbackHistory.flatMap(interaction => [
+                    {
+                        role: "assistant" as const,
+                        content: interaction.feedback
+                    },
+                    ...(interaction.studentResponse ? [{
+                        role: "user" as const,
+                        content: interaction.studentResponse
+                    }] : []),
+                    ...(interaction.botReplyToResponse ? [{
+                        role: "assistant" as const,
+                        content: interaction.botReplyToResponse
+                    }] : [])
+                ]);
+
+                messages.push({
+                    role: "user" as const,
+                    content: "Please provide the next activity instruction."
+                });
+
                 const response = await (this.anthropic as Anthropic).messages.create({
                     model: "claude-3-5-sonnet-20241022",
                     max_tokens: 4096,
                     temperature: 0.5,
                     system: prompt,
-                    messages: [
-                        {
-                            role: "user",
-                            content: "Please provide the next activity instruction."
-                        }
-                    ]
+                    messages: messages
                 });
 
                 feedback = response.content.reduce((acc, block) => {
@@ -113,13 +129,18 @@ export class WritingTutorService {
 
     // Constructs the AI prompt using session context and current sentence
     private buildPrompt(session: FeedbackSession, state: any): string {
+        const progressHistory = state.progressHistory.map((activity: any) => 
+            `Activity: ${activity.activityIndex + 1}\nStudent: ${activity.response}\nTutor: ${activity.botReply || ''}\n`
+        ).join('\n');
+
         return WRITING_TUTOR_PROMPT
             .replace('{{currentLessonPlan.lessonPlan.objective}}', state.currentLessonPlan.lessonPlan.objective)
             .replace('{{currentLessonPlan.pedagogy}}', state.currentLessonPlan.pedagogy)
             .replace('{{currentActivity.name}}', state.currentActivity.name)
             .replace('{{currentActivity.text}}', state.currentActivity.text)
             .replace('{{currentActivity.assessmentCriteria}}', JSON.stringify(state.currentActivity.assessmentCriteria || []))
-            .replace('{{studentGrade}}', session.studentGrade.toString());
+            .replace('{{studentGrade}}', session.studentGrade.toString())
+            .replace('{{progressHistory}}', progressHistory);
     }
 
     // Calculates and returns the current progress of the feedback session
@@ -138,8 +159,8 @@ export class WritingTutorService {
 
     // Handles student responses to feedback and generates appropriate AI replies
     async respondToFeedback(
-        session: FeedbackSession, 
-        studentResponse: string, 
+        session: FeedbackSession,
+        studentResponse: string,
         currentState: any
     ): Promise<string> {
         if (!session.lessonManager) {
@@ -161,17 +182,32 @@ export class WritingTutorService {
                 const response = await (this.anthropic as MockAIClient).messages.create.call(this);
                 reply = response.content[0].text;
             } else {
+                const messages = session.feedbackHistory.flatMap(interaction => [
+                    {
+                        role: "assistant" as const,
+                        content: interaction.feedback
+                    },
+                    ...(interaction.studentResponse ? [{
+                        role: "user" as const,
+                        content: interaction.studentResponse
+                    }] : []),
+                    ...(interaction.botReplyToResponse ? [{
+                        role: "assistant" as const,
+                        content: interaction.botReplyToResponse
+                    }] : [])
+                ]);
+
+                messages.push({
+                    role: "user",
+                    content: studentResponse
+                });
+
                 const response = await (this.anthropic as Anthropic).messages.create({
                     model: "claude-3-5-sonnet-20241022",
                     max_tokens: 4096,
                     temperature: 0.5,
                     system: prompt,
-                    messages: [
-                        {
-                            role: "user",
-                            content: studentResponse
-                        }
-                    ]
+                    messages: messages
                 });
 
                 reply = response.content.reduce((acc, block) => {
@@ -185,6 +221,13 @@ export class WritingTutorService {
             currentInteraction.studentResponse = studentResponse;
             currentInteraction.botReplyToResponse = reply;
 
+            session.lessonManager?.recordActivity(studentResponse, reply);
+
+            // Check if the activity is complete and advance if necessary
+            if (this.isActivityComplete(reply)) {
+                session.lessonManager?.advanceToNextActivity();
+            }
+
             return reply;
         } catch (_error) {
             throw new Error('Failed to generate response');
@@ -192,9 +235,7 @@ export class WritingTutorService {
     }
 
     private isActivityComplete(aiResponse: string): boolean {
-        return aiResponse.toLowerCase().includes("activity complete") ||
-            aiResponse.toLowerCase().includes("let's move on to the next activity") ||
-            aiResponse.toLowerCase().includes("you've completed this activity");
+        return aiResponse.includes("Activity complete! Ready for the next activity?");
     }
 
     // Splits essay text into individual sentences for analysis
@@ -206,5 +247,37 @@ export class WritingTutorService {
             .filter(s => s.length > 0);
 
         return sentences;
+    }
+
+    async generateWelcomeMessage(lessonPlans: any[]): Promise<string> {
+        try {
+            let response;
+            if (this.isMockClient) {
+                response = await (this.anthropic as MockAIClient).messages.create.call(this);
+            } else {
+                response = await (this.anthropic as Anthropic).messages.create({
+                    model: "claude-3-5-sonnet-20241022",
+                    max_tokens: 1024,
+                    temperature: 0.7,
+                    messages: [
+                        {
+                            role: "user",
+                            content: `You are a friendly writing tutor. Based on these lesson plans: ${JSON.stringify(lessonPlans)}, 
+                            provide a brief welcome message, then briefly summarize what the student will be working on, and then end with words of encouragement.`
+                        }
+                    ]
+                });
+            }
+
+            return response.content.reduce((acc: any, block: { text: any; }) => {
+                if ('text' in block) {
+                    return acc + block.text;
+                }
+                return acc;
+            }, '');
+        } catch (error) {
+            console.error('Error generating welcome message:', error);
+            return "Welcome! Let's work together to improve your writing skills. You can do this!";
+        }
     }
 }

@@ -122,5 +122,25 @@ describe("WritingTutorService", () => {
                 .to.be.rejectedWith("No previous interaction found");
         });
     });
+
+    describe("generateWelcomeMessage", () => {
+        it("should generate a welcome message based on lesson plans", async () => {
+            mockAnthropicClient.messages.create.mockResolvedValue({
+                content: [{ text: "Welcome! We'll focus on improving your writing clarity. You're going to do great!" }]
+            });
+
+            const result = await writingTutorService.generateWelcomeMessage(mockLessonPlans);
+
+            expect(result).to.equal("Welcome! We'll focus on improving your writing clarity. You're going to do great!");
+        });
+
+        it("should return default message on error", async () => {
+            mockAnthropicClient.messages.create.mockRejectedValue("API Error");
+
+            const result = await writingTutorService.generateWelcomeMessage(mockLessonPlans);
+
+            expect(result).to.equal("Welcome! Let's work together to improve your writing skills. You can do this!");
+        });
+    });
 });
 

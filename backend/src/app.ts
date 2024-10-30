@@ -81,6 +81,21 @@ app.use(async (ctx, next) => {
     }
 });
 
+// Helper function to sanitize JSON string
+function sanitizeJsonString(jsonStr: string): string {
+    // Trim whitespace and find the last closing brace/bracket
+    const trimmed = jsonStr.trim();
+    const lastBrace = trimmed.lastIndexOf('}');
+    const lastBracket = trimmed.lastIndexOf(']');
+    const lastValidChar = Math.max(lastBrace, lastBracket);
+
+    // If we found a valid JSON ending, truncate everything after it
+    if (lastValidChar !== -1) {
+        return trimmed.substring(0, lastValidChar + 1);
+    }
+    return trimmed;
+}
+
 // Routes
 router.post("/api/sessions", async (ctx: Context) => {
     const body = await ctx.request.body().value;
@@ -89,18 +104,28 @@ router.post("/api/sessions", async (ctx: Context) => {
     // Create initial session
     const session = tutorService.startFeedbackSession(studentId, essayText, studentGrade);
     sessions.set(session.id, session);
-    
+
     try {
         // Generate curriculum using lesson planner
-        const curriculum = await lessonPlanner.generateCurriculum({ 
-            student_text: essayText, 
-            student_reflection: body.student_reflection || "", 
-            student_grade: studentGrade 
+        const curriculum = await lessonPlanner.generateCurriculum({
+            student_text: essayText,
+            student_reflection: body.student_reflection || "",
+            student_grade: studentGrade
         });
 
+        let curriculumObject;
         if (curriculum.content[0].type === 'text') {
-            const lessonPlans = JSON.parse(curriculum.content[0].text);
-            session.lessonManager = new LessonManager(lessonPlans);
+            console.log('Curriculum content:', curriculum.content[0].text);
+            curriculumObject = JSON.parse(sanitizeJsonString(curriculum.content[0].text));
+            console.log('Parsed lesson plans:', curriculumObject);
+            
+            // Initialize the lesson manager and update session status
+            tutorService.initializeLessonManager(session, curriculumObject.lessonPlans);
+
+            // Generate welcome message
+            const welcomeMessage = await tutorService.generateWelcomeMessage(curriculumObject.lessonPlans);
+            ctx.response.body = { ...session, welcomeMessage };
+            return;
         } else {
             throw new Error('Invalid curriculum format received');
         }
@@ -124,7 +149,7 @@ router.get("/api/sessions/:sessionId/feedback", async (ctx: RouterContext<string
     }
 
     const session = sessions.get(sessionId)!;
-    
+
     if (!session.lessonManager) {
         ctx.response.status = 400;
         ctx.response.body = { error: "Lesson plan not initialized" };
@@ -165,7 +190,7 @@ router.post("/api/sessions/:sessionId/respond", async (ctx: RouterContext<"/api/
 
         // Record the activity in lesson manager
         session.lessonManager.recordActivity(response);
-        
+
         const currentState = session.lessonManager.getCurrentState();
         const reply = await tutorService.respondToFeedback(session, response, currentState);
 

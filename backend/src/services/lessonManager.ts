@@ -24,6 +24,7 @@ interface StudentProgress {
         lessonIndex: number;
         activityIndex: number;
         response: string;
+        botReply?: string;
     }[];
 }
 
@@ -41,8 +42,19 @@ export class LessonManager {
     }
 
     getCurrentState() {
+        if (!this.lessonPlans || this.lessonPlans.length === 0) {
+            throw new Error('No lesson plans available');
+        }
+
         const currentLesson = this.lessonPlans[this.progress.currentLessonIndex];
+        if (!currentLesson) {
+            throw new Error(`Invalid lesson index: ${this.progress.currentLessonIndex}`);
+        }
+
         const currentActivity = currentLesson.lessonPlan.activities[this.progress.currentActivityIndex];
+        if (!currentActivity) {
+            throw new Error(`Invalid activity index: ${this.progress.currentActivityIndex}`);
+        }
 
         return {
             currentLessonPlan: currentLesson,
@@ -52,14 +64,16 @@ export class LessonManager {
         };
     }
 
-    recordActivity(studentResponse: string) {
+    recordActivity(studentResponse: string, botReply?: string) {
         this.progress.completedActivities.push({
             lessonIndex: this.progress.currentLessonIndex,
             activityIndex: this.progress.currentActivityIndex,
-            response: studentResponse
+            response: studentResponse,
+            botReply: botReply
         });
+    }
 
-        // Move to next activity or lesson
+    advanceToNextActivity() {
         const currentLesson = this.lessonPlans[this.progress.currentLessonIndex];
         if (this.progress.currentActivityIndex < currentLesson.lessonPlan.activities.length - 1) {
             this.progress.currentActivityIndex++;

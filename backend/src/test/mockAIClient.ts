@@ -4,6 +4,7 @@ export interface AIClient {
 }
 
 export class MockAIClient implements AIClient {
+    [x: string]: any;
     beta: {
         promptCaching: {
             messages: {
@@ -20,6 +21,7 @@ export class MockAIClient implements AIClient {
         response: any;
         isError?: boolean;
     }> = [];
+    mockAnthropicClient: any;
 
     constructor() {
         const mockFunction = new MockFunction();
