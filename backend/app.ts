@@ -1,13 +1,19 @@
-import { Application, Router } from "../backend/deps.ts";
-import { CONFIG } from "../backend/config.ts";
+import { Anthropic, Application, Router } from "../backend/deps.ts";
+import { CONFIG } from "@/config.ts";
 import { WritingTutorService, type FeedbackSession } from "./services/writingTutor.ts";
 import type { Context, RouterContext } from "../backend/deps.ts";
-// import { RateLimiter } from "./middleware/rateLimiter.ts";
+import { LessonPlanner } from "@/services/lessonPlanner.ts";
 
 const app = new Application();
 const router = new Router();
+const anthropicClient = new Anthropic({
+    apiKey: CONFIG.ANTHROPIC_API_KEY, defaultHeaders: {
+        'anthropic-beta': 'prompt-caching-2024-07-31'
+    }
+});
 
-const tutorService = new WritingTutorService(CONFIG.ANTHROPIC_API_KEY);
+const tutorService = new WritingTutorService(anthropicClient);
+const lessonPlanner = new LessonPlanner(anthropicClient);
 
 // Add request logging middleware
 app.use(async (ctx, next) => {
@@ -130,6 +136,15 @@ router.post("/api/sessions/:sessionId/respond", async (ctx: RouterContext<"/api/
         ctx.response.status = 500;
         ctx.response.body = { error: "Failed to process response" };
     }
+});
+
+router.post("/api/lesson_planner", async (ctx: RouterContext<"/api/lesson_planner">) => {
+    const body = await ctx.request.body().value;
+    const { student_text, student_reflection, grade } = body;
+    console.log(body)
+    const curriculum = await lessonPlanner.generateCurriculum({ student_text, student_reflection, grade });
+    ctx.response.status = 200;
+    ctx.response.body = JSON.parse(curriculum.content[0].text)
 });
 
 // Apply router middleware

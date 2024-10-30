@@ -26,12 +26,12 @@ export class WritingTutorService {
     public anthropic: Anthropic | MockAIClient;
     private isMockClient = false;
 
-    constructor(api_key?: string) {
-        if (!api_key) {
+    constructor(anthropic?: Anthropic) {
+        if (!anthropic) {
             this.anthropic = new MockAIClient();
             this.isMockClient = true;
         } else {
-            this.anthropic = new Anthropic({ apiKey: api_key });
+            this.anthropic = anthropic;
         }
     }
 
@@ -57,7 +57,7 @@ export class WritingTutorService {
             let feedback: string;
 
             if (this.isMockClient) {
-                const response = await (this.anthropic as MockAIClient).messages.create.call();
+                const response = await (this.anthropic as MockAIClient).messages.create.call(this);
                 feedback = response.content[0].text;
             } else {
                 const response = await (this.anthropic as Anthropic).messages.create({
@@ -164,7 +164,7 @@ export class WritingTutorService {
             let reply: string;
 
             if (this.isMockClient) {
-                const response = await (this.anthropic as MockAIClient).messages.create.call();
+                const response = await (this.anthropic as MockAIClient).messages.create.call(this);
                 reply = response.content[0].text;
             } else {
                 const response = await (this.anthropic as Anthropic).messages.create({

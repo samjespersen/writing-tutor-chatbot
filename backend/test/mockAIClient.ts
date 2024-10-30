@@ -4,6 +4,13 @@ export interface AIClient {
 }
 
 export class MockAIClient implements AIClient {
+    beta: {
+        promptCaching: {
+            messages: {
+                create: (...args: any[]) => Promise<any>;
+            };
+        };
+    };
     messages: {
         create: MockFunction;
     };
@@ -15,8 +22,16 @@ export class MockAIClient implements AIClient {
     }> = [];
 
     constructor() {
+        const mockFunction = new MockFunction();
         this.messages = {
-            create: new MockFunction()
+            create: mockFunction
+        };
+        this.beta = {
+            promptCaching: {
+                messages: {
+                    create: (...args: any[]) => mockFunction.call(this, ...args)
+                }
+            }
         };
     }
 
@@ -63,7 +78,7 @@ class MockFunction {
         this.mockResponses = [{ response: error, isError: true }];
     }
 
-    call(...args: any[]): Promise<any> {
+    call(thisArg: any, ...args: any[]): Promise<any> {
         this.calls.push(args);
         const mockResponse = this.mockResponses[this.calls.length - 1] || this.mockResponses[0];
 
