@@ -1,6 +1,7 @@
 import { describe, it, expect, use, chaiAsPromised } from '@/deps.ts';
 import { WritingTutorService } from "../services/writingTutor.ts";
 import { MockAIClient } from "./mockAIClient.ts";
+import { beforeAll } from "https://deno.land/std@0.210.0/testing/bdd.ts";
 
 use(chaiAsPromised);
 
@@ -8,15 +9,14 @@ describe("WritingTutorService", () => {
     let mockAnthropicClient: MockAIClient;
     let writingTutorService: WritingTutorService;
 
-    function setup() {
+    beforeAll(() => {
         writingTutorService = new WritingTutorService();
         mockAnthropicClient = writingTutorService.anthropic as MockAIClient;
-    }
+    });
 
     describe("startFeedbackSession", () => {
         it("should create a new feedback session", () => {
-            setup();
-            const result = writingTutorService.startFeedbackSession("student1", "Sample essay text");
+            const result = writingTutorService.startFeedbackSession("student1", "Sample essay text");  
 
             expect(result).to.deep.include({
                 studentId: "student1",
@@ -31,7 +31,6 @@ describe("WritingTutorService", () => {
 
     describe("getNextFeedback", () => {
         it("should return feedback for current sentence", async () => {
-            setup();
             mockAnthropicClient.messages.create.mockResolvedValue({
                 id: 'msg_123',
                 content: [{ text: "This is great writing!", type: 'text' }],
@@ -47,7 +46,6 @@ describe("WritingTutorService", () => {
         });
 
         it("should handle API errors gracefully", async () => {
-            setup();
             mockAnthropicClient.messages.create.mockRejectedValue(new Error("API Error"));
 
             const session = writingTutorService.startFeedbackSession("student1", "This is a test sentence.");
@@ -58,7 +56,6 @@ describe("WritingTutorService", () => {
 
     describe("moveToNextSentence", () => {
         it("should increment sentence index", () => {
-            setup();
             const session = writingTutorService.startFeedbackSession("student1", "First sentence. Second sentence.");
             writingTutorService.moveToNextSentence(session);
 
@@ -66,7 +63,6 @@ describe("WritingTutorService", () => {
         });
 
         it("should mark session as completed when reaching end", () => {
-            setup();
             const session = writingTutorService.startFeedbackSession("student1", "Single sentence.");
             writingTutorService.moveToNextSentence(session);
 
@@ -76,7 +72,6 @@ describe("WritingTutorService", () => {
 
     describe("respondToFeedback", () => {
         it("should handle student response and return bot reply", async () => {
-            setup();
             mockAnthropicClient.messages.create.mockResolvedValue({
                 content: [{ text: "Great question!" }]
             });
