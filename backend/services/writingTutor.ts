@@ -1,6 +1,8 @@
 import { Anthropic } from "@/deps.ts";
 import { MockAIClient } from "@/test/mockAIClient.ts";
+import { WRITING_TUTOR_PROMPT } from "@/prompt/prompt.ts";
 
+// Interface defining the structure of a feedback session between student and tutor
 export interface FeedbackSession {
     id: string;
     studentId: string;
@@ -10,6 +12,7 @@ export interface FeedbackSession {
     status: 'active' | 'completed';
 }
 
+// Interface defining a single interaction within a feedback session
 export interface FeedbackInteraction {
     sentenceDiscussed: string;
     feedback: string;
@@ -18,34 +21,7 @@ export interface FeedbackInteraction {
     timestamp: Date;
 }
 
-const WRITING_TUTOR_PROMPT = `
-You are a helpful assistant working with individual middle-school students on their writing assignments. 
-Your role is to:
-- Focus on one key improvement area per feedback interaction
-- Provide specific, actionable feedback that a middle school student can understand and apply
-- Use a consistent structure for feedback:
-  1. Point out what works well (positive reinforcement)
-  2. Identify one area for improvement
-  3. Provide a clear example of how to improve
-- Keep explanations concise (2-3 sentences maximum per point)
-- Use age-appropriate vocabulary
-- Maintain an encouraging, supportive tone
-- Wait for student acknowledgment before moving to next sentences
-
-When explaining grammar or writing concepts:
-- Use simple analogies
-- Provide before/after examples
-- Avoid technical terminology unless necessary
-
-If any shared text contains personal identifying information, do not reference it directly in your responses.
-
-Current essay text: {{essayText}}
-Current sentence being discussed: {{currentSentence}}
-Previous feedback history: {{feedbackHistory}}
-
-Provide feedback for the current sentence focusing on one key improvement opportunity.
-`;
-
+// Service class handling the writing tutor functionality
 export class WritingTutorService {
     public anthropic: Anthropic | MockAIClient;
     private isMockClient = false;
@@ -59,7 +35,7 @@ export class WritingTutorService {
         }
     }
 
-
+    // Initializes a new feedback session for a student's essay
     startFeedbackSession(studentId: string, essayText: string): FeedbackSession {
         return {
             id: crypto.randomUUID(),
@@ -71,6 +47,7 @@ export class WritingTutorService {
         };
     }
 
+    // Generates AI feedback for the current sentence in the session
     async getNextFeedback(session: FeedbackSession): Promise<string> {
         const sentences = this.parseEssayIntoSentences(session.essayText);
         const currentSentence = sentences[session.currentSentenceIndex];
@@ -118,6 +95,7 @@ export class WritingTutorService {
         }
     }
 
+    // Advances the session to the next sentence or completes it if finished
     moveToNextSentence(session: FeedbackSession): void {
         const sentences = this.parseEssayIntoSentences(session.essayText);
         session.currentSentenceIndex++;
@@ -127,6 +105,7 @@ export class WritingTutorService {
         }
     }
 
+    // Splits essay text into individual sentences for analysis
     private parseEssayIntoSentences(essay: string): string[] {
         // Basic sentence parsing - could be improved with NLP libraries
         const sentences = essay
@@ -137,6 +116,7 @@ export class WritingTutorService {
         return sentences;
     }
 
+    // Constructs the AI prompt using session context and current sentence
     private buildPrompt(session: FeedbackSession, currentSentence: string): string {
         // Create a simplified version of feedback history for the prompt
         const simplifiedHistory = session.feedbackHistory.map(interaction => ({
@@ -151,7 +131,7 @@ export class WritingTutorService {
             .replace('{{feedbackHistory}}', JSON.stringify(simplifiedHistory, null, 2));
     }
 
-    // Helper method to get session progress
+    // Calculates and returns the current progress of the feedback session
     getSessionProgress(session: FeedbackSession): {
         totalSentences: number;
         currentPosition: number;
@@ -164,6 +144,8 @@ export class WritingTutorService {
             percentageComplete: Math.round(((session.currentSentenceIndex + 1) / sentences.length) * 100)
         };
     }
+
+    // Handles student responses to feedback and generates appropriate AI replies
     async respondToFeedback(session: FeedbackSession, studentResponse: string): Promise<string> {
         const currentInteraction = session.feedbackHistory[session.feedbackHistory.length - 1];
 
