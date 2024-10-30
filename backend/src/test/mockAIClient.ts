@@ -101,3 +101,27 @@ class MockFunction {
         return this.calls.length;
     }
 }
+
+export const mockLessonPlanResponse = {
+    id: 'mock_msg_123',
+    content: [{
+        type: 'text',
+        text: JSON.stringify([{
+            pedagogy: "SAFE",
+            lessonPlan: {
+                objective: "Improve writing clarity",
+                commonCoreStandards: ["W.8.1"],
+                themes: ["clarity", "structure"],
+                activities: [{
+                    order: 1,
+                    name: "Introduction to Clear Writing",
+                    text: "Let's analyze your writing style",
+                    theme: "clarity",
+                    assessmentCriteria: ["Uses clear language", "Maintains focus"]
+                }]
+            }
+        }])
+    }],
+    role: 'assistant',
+    model: 'claude-3-sonnet-20240229'
+};

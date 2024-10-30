@@ -13,7 +13,6 @@ describe("LessonPlanner", () => {
 
     describe("generateCurriculum", () => {
         it("should return mock response when using mock client", async () => {
-            lessonPlanner = new LessonPlanner(); // This will use mock client by default
 
             const params = {
                 student_text: "Sample writing",
@@ -21,15 +20,24 @@ describe("LessonPlanner", () => {
                 student_grade: 8
             };
 
-            const expectedMockResponse = {
-                id: 'mock_msg_123',
-                content: [{ text: "Mocked curriculum response", type: 'text' }],
-                role: 'assistant',
-                model: 'claude-3-sonnet-20240229'
-            };
-
             const result = await lessonPlanner.generateCurriculum(params);
-            expect(result).to.deep.equal(expectedMockResponse);
+            expect(result.content[0].type).to.equal('text');
+        });
+
+        it("should format curriculum response correctly", async () => {
+
+            const params = {
+                student_text: "Sample writing",
+                student_reflection: "My thoughts on writing",
+                student_grade: 8
+            };
+            const result = await lessonPlanner.generateCurriculum(params);
+
+            const parsedContent = JSON.parse((result.content[0] as { text: string }).text);
+
+            expect(parsedContent).to.be.an('array');
+            expect(parsedContent[0]).to.have.property('pedagogy');
+            expect(parsedContent[0].lessonPlan).to.have.property('activities');
         });
     });
 });

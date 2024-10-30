@@ -1,6 +1,6 @@
 import { Anthropic } from "npm:@anthropic-ai/sdk";
 import { CURRICULUM_DESIGNER_SYSTEM_PROMPT, CURRICULUM_DESIGNER_USER_PROMPT } from "@/src/prompt/prompt.ts";
-import { MockAIClient } from "@/src/test/mockAIClient.ts";
+import { MockAIClient, mockLessonPlanResponse } from "@/src/test/mockAIClient.ts";
 
 export class LessonPlanner {
     public anthropic: Anthropic | MockAIClient;
@@ -21,12 +21,7 @@ export class LessonPlanner {
         student_grade: number;
     }) {
         if (this.isMockClient) {
-            return {
-                id: 'mock_msg_123',
-                content: [{ text: "Mocked curriculum response", type: 'text' }],
-                role: 'assistant',
-                model: 'claude-3-sonnet-20240229'
-            };
+            return mockLessonPlanResponse;
         }
 
         const userPrompt = CURRICULUM_DESIGNER_USER_PROMPT

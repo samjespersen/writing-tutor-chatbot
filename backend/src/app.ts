@@ -3,6 +3,7 @@ import { CONFIG } from "./config.ts";
 import { WritingTutorService, type FeedbackSession } from "./services/writingTutor.ts";
 import type { Context, RouterContext } from "../deps.ts";
 import { LessonPlanner } from "./services/lessonPlanner.ts";
+import { LessonManager } from "./services/lessonManager.ts";
 
 const app = new Application();
 const router = new Router();
@@ -43,7 +44,7 @@ app.use(async (ctx, next) => {
 });
 
 // Session management (in-memory for demo purposes)
-const sessions = new Map<string, FeedbackSession>();
+const sessions = new Map<string, FeedbackSession & { lessonManager?: LessonManager }>();
 
 // JSON response validation
 app.use(async (ctx, next) => {
@@ -83,12 +84,32 @@ app.use(async (ctx, next) => {
 // Routes
 router.post("/api/sessions", async (ctx: Context) => {
     const body = await ctx.request.body().value;
-    const { studentId, essayText } = body;
+    const { studentId, essayText, studentGrade } = body;
 
-    const session = tutorService.startFeedbackSession(studentId, essayText);
+    // Create initial session
+    const session = tutorService.startFeedbackSession(studentId, essayText, studentGrade);
     sessions.set(session.id, session);
+    
+    try {
+        // Generate curriculum using lesson planner
+        const curriculum = await lessonPlanner.generateCurriculum({ 
+            student_text: essayText, 
+            student_reflection: body.student_reflection || "", 
+            student_grade: studentGrade 
+        });
 
-    ctx.response.body = session
+        if (curriculum.content[0].type === 'text') {
+            const lessonPlans = JSON.parse(curriculum.content[0].text);
+            session.lessonManager = new LessonManager(lessonPlans);
+        } else {
+            throw new Error('Invalid curriculum format received');
+        }
+    } catch (error) {
+        console.error('Error generating curriculum:', error);
+        session.status = 'awaiting_curriculum';
+    }
+
+    ctx.response.body = session;
 });
 
 
@@ -102,37 +123,17 @@ router.get("/api/sessions/:sessionId/feedback", async (ctx: RouterContext<string
         return;
     }
 
-    const session = sessions.get(sessionId);
-
-    if (!session) {
-        ctx.response.status = 404;
-        ctx.response.body = { error: "Session not found" };
-        return;
-    }
-
-    const feedback = await tutorService.getNextFeedback(session);
-    ctx.response.body = { feedback }
-});
-
-router.post("/api/sessions/:sessionId/next", (ctx: RouterContext<string>) => {
-    const { sessionId } = ctx.params;
-
-    if (!sessionId) {
+    const session = sessions.get(sessionId)!;
+    
+    if (!session.lessonManager) {
         ctx.response.status = 400;
-        ctx.response.body = { error: "Session ID is required" };
+        ctx.response.body = { error: "Lesson plan not initialized" };
         return;
     }
 
-    const session = sessions.get(sessionId);
-
-    if (!session) {
-        ctx.response.status = 404;
-        ctx.response.body = { error: "Session not found" };
-        return;
-    }
-
-    tutorService.moveToNextSentence(session);
-    ctx.response.body = { status: session.status };
+    const currentState = session.lessonManager.getCurrentState();
+    const feedback = await tutorService.getNextFeedback(session, currentState);
+    ctx.response.body = { feedback, currentState }
 });
 
 router.post("/api/sessions/:sessionId/respond", async (ctx: RouterContext<"/api/sessions/:sessionId/respond">) => {
@@ -144,16 +145,15 @@ router.post("/api/sessions/:sessionId/respond", async (ctx: RouterContext<"/api/
         return;
     }
 
-    const session = sessions.get(sessionId);
+    const session = sessions.get(sessionId)!;
 
-    if (!session) {
-        ctx.response.status = 404;
-        ctx.response.body = { error: "Session not found" };
+    if (!session.lessonManager) {
+        ctx.response.status = 400;
+        ctx.response.body = { error: "Lesson plan not initialized" };
         return;
     }
 
     try {
-        // Get the student's response from request body
         const body = await ctx.request.body().value;
         const { response } = body;
 
@@ -163,12 +163,17 @@ router.post("/api/sessions/:sessionId/respond", async (ctx: RouterContext<"/api/
             return;
         }
 
-        const reply = await tutorService.respondToFeedback(session, response);
+        // Record the activity in lesson manager
+        session.lessonManager.recordActivity(response);
+        
+        const currentState = session.lessonManager.getCurrentState();
+        const reply = await tutorService.respondToFeedback(session, response, currentState);
 
-        ctx.response.body = JSON.stringify({
+        ctx.response.body = {
             reply,
-            conversation: session.feedbackHistory[session.feedbackHistory.length - 1]
-        }, null, 2);
+            conversation: session.feedbackHistory[session.feedbackHistory.length - 1],
+            currentState
+        };
     } catch (error) {
         console.error('Error processing response:', error);
         ctx.response.status = 500;

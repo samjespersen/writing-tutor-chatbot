@@ -2,12 +2,29 @@ import { describe, it, expect, use, chaiAsPromised } from '@/deps.ts';
 import { WritingTutorService } from "../services/writingTutor.ts";
 import { MockAIClient } from "./mockAIClient.ts";
 import { beforeAll } from "https://deno.land/std@0.210.0/testing/bdd.ts";
+import { LessonManager } from "../services/lessonManager.ts";
 
 use(chaiAsPromised);
 
 describe("WritingTutorService", () => {
     let mockAnthropicClient: MockAIClient;
     let writingTutorService: WritingTutorService;
+
+    const mockLessonPlans = [{
+        pedagogy: 'SAFE' as const,
+        lessonPlan: {
+            objective: "Test objective",
+            commonCoreStandards: ["TEST.1"],
+            themes: ["writing"],
+            activities: [{
+                order: 1,
+                name: "Test Activity",
+                text: "Activity instructions",
+                theme: "writing",
+                assessmentCriteria: ["criteria1"]
+            }]
+        }
+    }];
 
     beforeAll(() => {
         writingTutorService = new WritingTutorService();
@@ -16,78 +33,94 @@ describe("WritingTutorService", () => {
 
     describe("startFeedbackSession", () => {
         it("should create a new feedback session", () => {
-            const result = writingTutorService.startFeedbackSession("student1", "Sample essay text");  
+            const result = writingTutorService.startFeedbackSession("student1", "Sample essay text", 8);
 
             expect(result).to.deep.include({
                 studentId: "student1",
                 essayText: "Sample essay text",
-                currentSentenceIndex: 0,
+                studentGrade: 8,
                 feedbackHistory: [],
-                status: 'active'
+                status: 'awaiting_curriculum'
             });
             expect(result.id).to.be.a('string');
         });
     });
 
+    describe("initializeLessonManager", () => {
+        it("should initialize lesson manager and update session status", () => {
+            const session = writingTutorService.startFeedbackSession("student1", "Sample essay text", 8);
+            writingTutorService.initializeLessonManager(session, mockLessonPlans);
+
+            expect(session.lessonManager).to.be.instanceOf(LessonManager);
+            expect(session.status).to.equal('active');
+        });
+    });
+
     describe("getNextFeedback", () => {
-        it("should return feedback for current sentence", async () => {
+        it("should return feedback for current activity", async () => {
             mockAnthropicClient.messages.create.mockResolvedValue({
                 id: 'msg_123',
-                content: [{ text: "This is great writing!", type: 'text' }],
+                content: [{ text: "Activity feedback", type: 'text' }],
                 role: 'assistant',
                 model: 'claude-3-sonnet-20240229'
             });
 
-            const session = writingTutorService.startFeedbackSession("student1", "This is a test sentence.");
-            const result = await writingTutorService.getNextFeedback(session);
+            const session = writingTutorService.startFeedbackSession("student1", "Test text", 8);
+            writingTutorService.initializeLessonManager(session, mockLessonPlans);
 
-            expect(result).to.equal("This is great writing!");
-            expect(mockAnthropicClient.messages.create.getCallCount()).to.be.greaterThan(0);
+            const currentState = session.lessonManager!.getCurrentState();
+            const result = await writingTutorService.getNextFeedback(session, currentState);
+
+            expect(result).to.equal("Activity feedback");
+            expect(session.feedbackHistory).to.have.lengthOf(1);
+            expect(session.feedbackHistory[0].activityName).to.equal("Test Activity");
         });
 
-        it("should handle API errors gracefully", async () => {
-            mockAnthropicClient.messages.create.mockRejectedValue(new Error("API Error"));
+        it("should handle completion state", async () => {
+            const session = writingTutorService.startFeedbackSession("student1", "Test text", 8);
+            writingTutorService.initializeLessonManager(session, mockLessonPlans);
 
-            const session = writingTutorService.startFeedbackSession("student1", "This is a test sentence.");
-            await expect(writingTutorService.getNextFeedback(session))
-                .to.be.rejectedWith("Failed to generate feedback");
-        });
-    });
+            // Complete the activity
+            session.lessonManager?.recordActivity("test response");
 
-    describe("moveToNextSentence", () => {
-        it("should increment sentence index", () => {
-            const session = writingTutorService.startFeedbackSession("student1", "First sentence. Second sentence.");
-            writingTutorService.moveToNextSentence(session);
-
-            expect(session.currentSentenceIndex).to.equal(1);
-        });
-
-        it("should mark session as completed when reaching end", () => {
-            const session = writingTutorService.startFeedbackSession("student1", "Single sentence.");
-            writingTutorService.moveToNextSentence(session);
-
+            const currentState = session.lessonManager!.getCurrentState();
+            const result = await writingTutorService.getNextFeedback(session, currentState);
+            expect(result).to.include("Congratulations");
             expect(session.status).to.equal('completed');
         });
     });
 
     describe("respondToFeedback", () => {
-        it("should handle student response and return bot reply", async () => {
+        it("should handle student response", async () => {
             mockAnthropicClient.messages.create.mockResolvedValue({
-                content: [{ text: "Great question!" }]
+                content: [{ text: "Great response!", type: 'text' }]
             });
 
-            const session = writingTutorService.startFeedbackSession("student1", "Test sentence.");
-            session.feedbackHistory.push({
-                sentenceDiscussed: "Test sentence.",
-                feedback: "Initial feedback",
-                timestamp: new Date()
-            });
+            const session = writingTutorService.startFeedbackSession("student1", "Test text", 8);
+            writingTutorService.initializeLessonManager(session, mockLessonPlans);
 
-            const result = await writingTutorService.respondToFeedback(session, "Student question");
+            // Add initial feedback
+            const currentState = session.lessonManager!.getCurrentState();
+            await writingTutorService.getNextFeedback(session, currentState);
 
-            expect(result).to.equal("Great question!");
-            expect(session.feedbackHistory[0].studentResponse).to.equal("Student question");
-            expect(session.feedbackHistory[0].botReplyToResponse).to.equal("Great question!");
+            const result = await writingTutorService.respondToFeedback(
+                session,
+                "Student response",
+                currentState
+            );
+
+            expect(result).to.equal("Great response!");
+            expect(session.feedbackHistory[0].studentResponse).to.equal("Student response");
+        });
+
+        it("should throw error if no previous interaction exists", async () => {
+            const session = writingTutorService.startFeedbackSession("student1", "Test text", 8);
+            writingTutorService.initializeLessonManager(session, mockLessonPlans);
+            const currentState = session.lessonManager!.getCurrentState();
+
+            await expect(writingTutorService.respondToFeedback(session, "Response", currentState))
+                .to.be.rejectedWith("No previous interaction found");
         });
     });
 });
+
