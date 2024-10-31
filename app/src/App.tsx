@@ -202,6 +202,13 @@ function App() {
         }
     };
 
+    // Add this validation function
+    const isFormValid = () => {
+        return studentText.trim() !== "" &&
+            studentReflection.trim() !== "" &&
+            studentGrade.trim() !== "";
+    };
+
     return (
         <div className="container">
             <h1>Writing Tutor Chatbot</h1>
@@ -237,23 +244,27 @@ function App() {
                         />
                     </label>
 
-                    <label className="input-label">
-                        Student Grade:
-                        <input
-                            type="text"
-                            value={studentGrade}
-                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setStudentGrade(e.target.value)}
-                            style={{ width: "100%" }}
-                            readOnly={!!session}
-                        />
-                    </label>
+
+                    <select
+                        value={studentGrade}
+                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setStudentGrade(e.target.value)}
+                        style={{ width: "20%" }}
+                        disabled={!!session}
+                    >
+                        <option value="">Select Grade</option>
+                        {Array.from({ length: 7 }, (_, i) => i + 6).map(grade => (
+                            <option key={grade} value={grade}>
+                                {grade}
+                            </option>
+                        ))}
+                    </select>
                 </div>
             </div>
 
             {!session && (
                 <button
                     onClick={handleSubmit}
-                    disabled={isLoading}
+                    disabled={isLoading || !isFormValid()}
                     className="primary-button"
                 >
                     {isLoading ? (
