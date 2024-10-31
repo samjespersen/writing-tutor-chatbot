@@ -1,5 +1,6 @@
-import React, { useState } from "react";
-import type { LessonPlannerResponse, ErrorResponse } from "../../backend/src/types";
+import React, { useState, useRef, useEffect } from "react";
+import './App.css';
+
 
 // Define the structure of a lesson plan
 interface LessonPlan {
@@ -33,6 +34,53 @@ interface Session {
     welcomeMessage?: string;
 }
 
+// Add this new interface near the top with other interfaces
+interface ChatMessage {
+    role: 'user' | 'assistant';
+    content: string;
+    isTyping?: boolean;
+}
+
+// Add this new helper function
+const typeMessage = (message: string, setChat: React.Dispatch<React.SetStateAction<ChatMessage[]>>) => {
+    const words = message.split(' ');
+    let currentIndex = 0;
+
+    const addNextChunk = () => {
+        if (currentIndex >= words.length) return;
+
+        // Take 2-4 words at a time randomly
+        const chunkSize = Math.floor(Math.random() * 4) + 3;
+        const chunk = words.slice(currentIndex, currentIndex + chunkSize).join(' ') + ' ';
+
+        setChat(prev => {
+            const newHistory = [...prev];
+            const lastMessage = newHistory[newHistory.length - 1];
+            if (lastMessage.isTyping) {
+                lastMessage.content = words.slice(0, currentIndex + chunkSize).join(' ');
+            }
+            return newHistory;
+        });
+
+        currentIndex += chunkSize;
+
+        if (currentIndex < words.length) {
+            // Random delay between 50-150ms between chunks
+            setTimeout(addNextChunk, Math.random() * 75 + 50);
+        } else {
+            // Remove typing status when complete
+            setTimeout(() => {
+                setChat(prev => prev.map((msg, idx) =>
+                    idx === prev.length - 1 ? { ...msg, isTyping: false } : msg
+                ));
+            }, 100);
+        }
+    };
+
+    addNextChunk();
+};
+
+
 function App() {
     const [studentText, setStudentText] = useState("");
     const [studentReflection, setStudentReflection] = useState("");
@@ -40,12 +88,21 @@ function App() {
     const [result, setResult] = useState<ResultState>(null);
     const [session, setSession] = useState<Session | null>(null);
     const [activeTab, setActiveTab] = useState<'chat' | 'plan'>('chat');
-    const [chatHistory, setChatHistory] = useState<Array<{ role: 'user' | 'assistant', content: string }>>([]);
+    const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
     const [chatInput, setChatInput] = useState("");
     const [isLessonStarted, setIsLessonStarted] = useState(false);
     const [inputsCollapsed, setInputsCollapsed] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+    const chatContainerRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (chatContainerRef.current) {
+            chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+        }
+    }, [chatHistory]);
 
     const handleSubmit = async () => {
+        setIsLoading(true);
         try {
             const response = await fetch("http://localhost:3000/api/sessions", {
                 method: "POST",
@@ -79,12 +136,15 @@ function App() {
             setInputsCollapsed(true);
         } catch (error) {
             setResult([{ error: error instanceof Error ? error.message : 'An unknown error occurred' }]);
+        } finally {
+            setIsLoading(false);
         }
     };
 
     const handleStartLesson = async () => {
         if (!session?.id) return;
 
+        setIsLoading(true);
         try {
             const response = await fetch(`http://localhost:3000/api/sessions/${session.id}/feedback`);
             const data = await response.json();
@@ -94,10 +154,14 @@ function App() {
                 return;
             }
 
-            setChatHistory(prev => [...prev, { role: 'assistant', content: data.feedback }]);
+            setChatHistory(prev => [...prev, { role: 'assistant', content: '', isTyping: true }]);
+            typeMessage(data.feedback, setChatHistory);
+
             setIsLessonStarted(true);
         } catch (error) {
             setResult([{ error: error instanceof Error ? error.message : 'An unknown error occurred' }]);
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -107,6 +171,8 @@ function App() {
         const userMessage = chatInput.trim();
         setChatInput("");
         setChatHistory(prev => [...prev, { role: 'user', content: userMessage }]);
+
+        setIsLoading(true);
 
         try {
             const response = await fetch(`http://localhost:3000/api/sessions/${session.id}/respond`, {
@@ -126,61 +192,59 @@ function App() {
                 return;
             }
 
-            setChatHistory(prev => [...prev, { role: 'assistant', content: data.reply }]);
+            setChatHistory(prev => [...prev, { role: 'assistant', content: '', isTyping: true }]);
+            typeMessage(data.reply, setChatHistory);
+
         } catch (error) {
             setResult([{ error: error instanceof Error ? error.message : 'An unknown error occurred' }]);
+        } finally {
+            setIsLoading(false);
         }
     };
 
     return (
-        <div style={{ padding: "20px", maxWidth: "800px", margin: "0 auto" }}>
+        <div className="container">
             <h1>Writing Tutor Chatbot</h1>
 
             <div style={{ marginBottom: "20px" }}>
                 {session && (
                     <button
                         onClick={() => setInputsCollapsed(!inputsCollapsed)}
-                        style={{
-                            padding: "5px 10px",
-                            backgroundColor: "#f8f9fa",
-                            border: "1px solid #ccc",
-                            borderRadius: "5px",
-                            marginBottom: "10px",
-                            cursor: "pointer",
-                            width: "100%",
-                            textAlign: "left"
-                        }}
+                        className="collapse-button"
                     >
                         {inputsCollapsed ? "▶" : "▼"} Student Information
                     </button>
                 )}
-                
+
                 <div style={{ display: session && inputsCollapsed ? "none" : "block" }}>
-                    <label style={{ display: "block", marginBottom: "5px" }}>
+                    <label className="input-label">
                         Student Text:
                         <textarea
                             value={studentText}
                             onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setStudentText(e.target.value)}
-                            style={{ width: "100%", minHeight: "100px" }}
+                            className="text-input"
+                            readOnly={!!session}
                         />
                     </label>
 
-                    <label style={{ display: "block", marginBottom: "5px" }}>
+                    <label className="input-label">
                         Student Reflection:
                         <textarea
                             value={studentReflection}
                             onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setStudentReflection(e.target.value)}
-                            style={{ width: "100%", minHeight: "100px" }}
+                            className="text-input"
+                            readOnly={!!session}
                         />
                     </label>
 
-                    <label style={{ display: "block", marginBottom: "5px" }}>
+                    <label className="input-label">
                         Student Grade:
                         <input
                             type="text"
                             value={studentGrade}
                             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setStudentGrade(e.target.value)}
                             style={{ width: "100%" }}
+                            readOnly={!!session}
                         />
                     </label>
                 </div>
@@ -189,16 +253,14 @@ function App() {
             {!session && (
                 <button
                     onClick={handleSubmit}
-                    style={{
-                        padding: "10px 20px",
-                        backgroundColor: "#007bff",
-                        color: "white",
-                        border: "none",
-                        borderRadius: "5px",
-                        cursor: "pointer",
-                    }}
+                    disabled={isLoading}
+                    className="primary-button"
                 >
-                    Start Session
+                    {isLoading ? (
+                        <div className="button-spinner" />
+                    ) : (
+                        "Start Session"
+                    )}
                 </button>
             )}
 
@@ -207,26 +269,13 @@ function App() {
                     <div style={{ borderBottom: "1px solid #ccc", marginBottom: "20px" }}>
                         <button
                             onClick={() => setActiveTab('chat')}
-                            style={{
-                                padding: "10px 20px",
-                                backgroundColor: activeTab === 'chat' ? "#007bff" : "#f8f9fa",
-                                color: activeTab === 'chat' ? "white" : "black",
-                                border: "none",
-                                borderRadius: "5px 5px 0 0",
-                                marginRight: "10px",
-                            }}
+                            className={`tab-button ${activeTab === 'chat' ? 'active' : 'inactive'}`}
                         >
                             Chat
                         </button>
                         <button
                             onClick={() => setActiveTab('plan')}
-                            style={{
-                                padding: "10px 20px",
-                                backgroundColor: activeTab === 'plan' ? "#007bff" : "#f8f9fa",
-                                color: activeTab === 'plan' ? "white" : "black",
-                                border: "none",
-                                borderRadius: "5px 5px 0 0",
-                            }}
+                            className={`tab-button ${activeTab === 'plan' ? 'active' : 'inactive'}`}
                         >
                             Lesson Plan
                         </button>
@@ -234,77 +283,56 @@ function App() {
 
                     {activeTab === 'chat' && (
                         <div>
-                            <div style={{
-                                border: "1px solid #ccc",
-                                borderRadius: "5px",
-                                padding: "20px",
-                                marginBottom: "20px",
-                                maxHeight: "400px",
-                                overflowY: "auto"
-                            }}>
+                            <div className="chat-container" ref={chatContainerRef}>
                                 {chatHistory.map((msg, idx) => (
                                     <div
                                         key={idx}
-                                        style={{
-                                            marginBottom: "10px",
-                                            textAlign: msg.role === 'user' ? 'right' : 'left'
-                                        }}
+                                        className={`chat-message ${msg.role}`}
                                     >
-                                        <div style={{
-                                            display: "inline-block",
-                                            padding: "8px 12px",
-                                            borderRadius: "15px",
-                                            backgroundColor: msg.role === 'user' ? "#007bff" : "#f8f9fa",
-                                            color: msg.role === 'user' ? "white" : "black",
-                                            maxWidth: "70%",
-                                            whiteSpace: "pre-wrap"
-                                        }}>
-                                            {msg.content}
+                                        <div className={`message-bubble ${msg.role}`}>
+                                            {msg.isTyping ? (
+                                                <span className="typing-text">{msg.content}</span>
+                                            ) : (
+                                                msg.content
+                                            )}
                                         </div>
                                     </div>
                                 ))}
+                                {isLoading && (
+                                    <div className="chat-message assistant">
+                                        <div className="message-bubble assistant">
+                                            <div className="typing-indicator">
+                                                <span></span>
+                                                <span></span>
+                                                <span></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             {!isLessonStarted ? (
                                 <button
                                     onClick={handleStartLesson}
-                                    style={{
-                                        padding: "10px 20px",
-                                        backgroundColor: "#28a745",
-                                        color: "white",
-                                        border: "none",
-                                        borderRadius: "5px",
-                                        cursor: "pointer",
-                                        width: "100%"
-                                    }}
+                                    disabled={isLoading}
+                                    className="send-button"
                                 >
-                                    Begin lesson
+                                    {isLoading ? (
+                                        <div className="button-spinner" />
+                                    ) : (
+                                        "Begin lesson"
+                                    )}
                                 </button>
                             ) : (
                                 <div>
                                     <textarea
                                         value={chatInput}
                                         onChange={(e) => setChatInput(e.target.value)}
-                                        style={{
-                                            width: "100%",
-                                            minHeight: "100px",
-                                            marginBottom: "10px",
-                                            padding: "10px",
-                                            borderRadius: "5px",
-                                            border: "1px solid #ccc"
-                                        }}
+                                        className="chat-input"
                                     />
                                     <button
                                         onClick={handleSendChat}
-                                        style={{
-                                            padding: "10px 20px",
-                                            backgroundColor: "#28a745",
-                                            color: "white",
-                                            border: "none",
-                                            borderRadius: "5px",
-                                            cursor: "pointer",
-                                            width: "100%"
-                                        }}
+                                        className="send-button"
                                     >
                                         Send chat
                                     </button>
@@ -314,16 +342,16 @@ function App() {
                     )}
 
                     {activeTab === 'plan' && result && (
-                        <div style={{ marginTop: "20px" }}>
+                        <div className="lesson-plan">
                             {Array.isArray(result) ? (
                                 result.map((plan, index) => (
-                                    <div key={index} style={{ marginBottom: "20px", padding: "20px", border: "1px solid #ccc" }}>
+                                    <div key={index} className="lesson-card">
                                         <h4>Objective: {plan.lessonPlan.objective}</h4>
 
                                         <div>
                                             <h4>Activities:</h4>
                                             {plan.lessonPlan.activities.map((activity, idx) => (
-                                                <div key={idx} style={{ marginBottom: "15px", padding: "10px", backgroundColor: "#f8f9fa" }}>
+                                                <div key={idx} className="activity-card">
                                                     <h5>Activity {activity.order}: {activity.name}</h5>
                                                     <p>{activity.text}</p>
                                                 </div>
