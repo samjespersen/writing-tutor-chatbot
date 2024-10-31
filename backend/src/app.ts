@@ -4,6 +4,16 @@ import { WritingTutorService, type FeedbackSession } from "./services/writingTut
 import type { Context, RouterContext } from "../deps.ts";
 import { LessonPlanner } from "./services/lessonPlanner.ts";
 import { LessonManager } from "./services/lessonManager.ts";
+import type {
+    CreateSessionRequest,
+    CreateSessionResponse,
+    GetFeedbackResponse,
+    RespondToFeedbackRequest,
+    RespondToFeedbackResponse,
+    LessonPlannerRequest,
+    LessonPlannerResponse,
+    ErrorResponse
+} from "./types.ts";
 
 const app = new Application();
 const router = new Router();
@@ -96,122 +106,175 @@ function sanitizeJsonString(jsonStr: string): string {
     return trimmed;
 }
 
-// Routes
-router.post("/api/sessions", async (ctx: Context) => {
+// Helper function to validate request body
+async function validateRequestBody<T>(ctx: Context, validator: (body: unknown) => body is T): Promise<T | null> {
     const body = await ctx.request.body().value;
-    const { studentId, essayText, studentGrade } = body;
+    return validator(body) ? body : null;
+}
 
-    // Create initial session
+// Type guards for request validation
+function isCreateSessionRequest(body: unknown): body is CreateSessionRequest {
+    return typeof body === 'object' && body !== null &&
+        'studentId' in body && typeof body.studentId === 'string' &&
+        'essayText' in body && typeof body.essayText === 'string' &&
+        'studentGrade' in body && typeof body.studentGrade === 'number';
+}
+
+function isRespondToFeedbackRequest(body: unknown): body is RespondToFeedbackRequest {
+    return typeof body === 'object' && body !== null &&
+        'response' in body && typeof body.response === 'string';
+}
+
+function isLessonPlannerRequest(body: unknown): body is LessonPlannerRequest {
+    return typeof body === 'object' && body !== null &&
+        'student_text' in body && typeof body.student_text === 'string' &&
+        'student_reflection' in body && typeof body.student_reflection === 'string' &&
+        'student_grade' in body && typeof body.student_grade === 'number';
+}
+
+// Helper function to create error response
+function createErrorResponse(message: string): ErrorResponse {
+    return { error: message };
+}
+
+// Routes
+router.post("/api/sessions", async (ctx: RouterContext<"/api/sessions">) => {
+    const body = await validateRequestBody(ctx, isCreateSessionRequest);
+    if (!body) {
+        ctx.response.status = 400;
+        ctx.response.body = createErrorResponse("Invalid request body");
+        return;
+    }
+
+    const { studentId, essayText, studentGrade } = body;
     const session = tutorService.startFeedbackSession(studentId, essayText, studentGrade);
     sessions.set(session.id, session);
 
     try {
-        // Generate curriculum using lesson planner
         const curriculum = await lessonPlanner.generateCurriculum({
             student_text: essayText,
-            student_reflection: body.student_reflection || "",
+            student_reflection: body.student_reflection ?? "",
             student_grade: studentGrade
         });
 
-        let curriculumObject;
         if (curriculum.content[0].type === 'text') {
-            console.log('Curriculum content:', curriculum.content[0].text);
-            curriculumObject = JSON.parse(sanitizeJsonString(curriculum.content[0].text));
+            const curriculumText = curriculum.content[0].text;
+            console.log('Curriculum content:', curriculumText);
+            const curriculumObject = JSON.parse(sanitizeJsonString(curriculumText));
             console.log('Parsed lesson plans:', curriculumObject);
             
-            // Initialize the lesson manager and update session status
             tutorService.initializeLessonManager(session, curriculumObject.lessonPlans);
-
-            // Generate welcome message
             const welcomeMessage = await tutorService.generateWelcomeMessage(curriculumObject.lessonPlans);
-            ctx.response.body = { ...session, welcomeMessage };
+            
+            const response: CreateSessionResponse = { ...session, welcomeMessage };
+            ctx.response.body = response;
             return;
-        } else {
-            throw new Error('Invalid curriculum format received');
         }
+        throw new Error('Invalid curriculum format received');
     } catch (error) {
         console.error('Error generating curriculum:', error);
         session.status = 'awaiting_curriculum';
+        const response: CreateSessionResponse = { ...session };
+        ctx.response.body = response;
     }
-
-    ctx.response.body = session;
 });
 
-
-
-router.get("/api/sessions/:sessionId/feedback", async (ctx: RouterContext<string>) => {
+router.get("/api/sessions/:sessionId/feedback", async (ctx: RouterContext<"/api/sessions/:sessionId/feedback">) => {
     const { sessionId } = ctx.params;
-
     if (!sessionId) {
         ctx.response.status = 400;
-        ctx.response.body = { error: "Session ID is required" };
+        ctx.response.body = createErrorResponse("Session ID is required");
         return;
     }
 
-    const session = sessions.get(sessionId)!;
+    const session = sessions.get(sessionId);
+    if (!session) {
+        ctx.response.status = 404;
+        ctx.response.body = createErrorResponse("Session not found");
+        return;
+    }
 
     if (!session.lessonManager) {
         ctx.response.status = 400;
-        ctx.response.body = { error: "Lesson plan not initialized" };
+        ctx.response.body = createErrorResponse("Lesson plan not initialized");
         return;
     }
 
     const currentState = session.lessonManager.getCurrentState();
     const feedback = await tutorService.getNextFeedback(session, currentState);
-    ctx.response.body = { feedback, currentState }
+    
+    const response: GetFeedbackResponse = { feedback, currentState };
+    ctx.response.body = response;
 });
 
 router.post("/api/sessions/:sessionId/respond", async (ctx: RouterContext<"/api/sessions/:sessionId/respond">) => {
     const { sessionId } = ctx.params;
-
     if (!sessionId) {
         ctx.response.status = 400;
-        ctx.response.body = { error: "Session ID is required" };
+        ctx.response.body = createErrorResponse("Session ID is required");
         return;
     }
 
-    const session = sessions.get(sessionId)!;
+    const session = sessions.get(sessionId);
+    if (!session) {
+        ctx.response.status = 404;
+        ctx.response.body = createErrorResponse("Session not found");
+        return;
+    }
 
     if (!session.lessonManager) {
         ctx.response.status = 400;
-        ctx.response.body = { error: "Lesson plan not initialized" };
+        ctx.response.body = createErrorResponse("Lesson plan not initialized");
+        return;
+    }
+
+    const body = await validateRequestBody(ctx, isRespondToFeedbackRequest);
+    if (!body) {
+        ctx.response.status = 400;
+        ctx.response.body = createErrorResponse("Invalid request body");
         return;
     }
 
     try {
-        const body = await ctx.request.body().value;
         const { response } = body;
-
-        if (!response) {
-            ctx.response.status = 400;
-            ctx.response.body = { error: "Response text is required" };
-            return;
-        }
-
-        // Record the activity in lesson manager
         session.lessonManager.recordActivity(response);
 
         const currentState = session.lessonManager.getCurrentState();
         const reply = await tutorService.respondToFeedback(session, response, currentState);
 
-        ctx.response.body = {
+        const responseBody: RespondToFeedbackResponse = {
             reply,
             conversation: session.feedbackHistory[session.feedbackHistory.length - 1],
             currentState
         };
+        ctx.response.body = responseBody;
     } catch (error) {
         console.error('Error processing response:', error);
         ctx.response.status = 500;
-        ctx.response.body = { error: "Failed to process response" };
+        ctx.response.body = createErrorResponse("Failed to process response");
     }
 });
 
 router.post("/api/lesson_planner", async (ctx: RouterContext<"/api/lesson_planner">) => {
-    const body = await ctx.request.body().value;
+    const body = await validateRequestBody(ctx, isLessonPlannerRequest);
+    if (!body) {
+        ctx.response.status = 400;
+        ctx.response.body = createErrorResponse("Invalid request body");
+        return;
+    }
+    
     const { student_text, student_reflection, student_grade } = body;
-    const curriculum = await lessonPlanner.generateCurriculum({ student_text, student_reflection, student_grade });
+    const curriculum = await lessonPlanner.generateCurriculum({ 
+        student_text, 
+        student_reflection, 
+        student_grade 
+    });
+    
     ctx.response.status = 200;
-    ctx.response.body = { text: curriculum.content[0].type == "text" ? curriculum.content[0].text : "" }
+    const response: LessonPlannerResponse = { 
+        text: curriculum.content[0].type === "text" ? curriculum.content[0].text : "" 
+    };
+    ctx.response.body = response;
 });
 
 // Apply router middleware
