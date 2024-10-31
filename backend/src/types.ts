@@ -1,3 +1,4 @@
+import type { LessonPlan } from "@/src/services/lessonManager.ts";
 import type { FeedbackSession, FeedbackInteraction } from "./services/writingTutor.ts";
 
 // POST /api/sessions
@@ -10,6 +11,7 @@ export interface CreateSessionRequest {
 
 export interface CreateSessionResponse extends FeedbackSession {
     welcomeMessage?: string;
+    curriculum?: LessonPlan[];
 }
 
 // GET /api/sessions/:sessionId/feedback

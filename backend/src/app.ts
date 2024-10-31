@@ -166,7 +166,11 @@ router.post("/api/sessions", async (ctx: RouterContext<"/api/sessions">) => {
             tutorService.initializeLessonManager(session, curriculumObject.lessonPlans);
             const welcomeMessage = await tutorService.generateWelcomeMessage(curriculumObject.lessonPlans);
             
-            const response: CreateSessionResponse = { ...session, welcomeMessage };
+            const response: CreateSessionResponse = { 
+                ...session, 
+                welcomeMessage,
+                curriculum: curriculumObject.lessonPlans
+            };
             ctx.response.body = response;
             return;
         }

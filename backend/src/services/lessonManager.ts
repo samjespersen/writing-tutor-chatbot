@@ -7,7 +7,7 @@ interface Activity {
     assessmentCriteria?: string[];
 }
 
-interface LessonPlan {
+export interface LessonPlan {
     pedagogy: 'SAFE' | 'MPR';
     lessonPlan: {
         objective: string;
