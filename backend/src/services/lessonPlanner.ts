@@ -31,7 +31,7 @@ export class LessonPlanner {
             .replace("{{student_grade}}", params.student_grade.toString());
 
         const response: Anthropic.Message = await this.anthropic.beta.promptCaching.messages.create({
-            // @ts-ignore
+            // @ts-ignore: Anthropic types don't properly support system messages in this version
             system: CURRICULUM_DESIGNER_SYSTEM_PROMPT,
             messages: [{ role: "user", content: userPrompt }],
             model: CONFIG.MODEL_NAME,
