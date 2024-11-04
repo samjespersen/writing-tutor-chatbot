@@ -3,6 +3,7 @@ import { Anthropic } from "@/deps.ts";
 import { MockAIClient } from "../test/mockAIClient.ts";
 import { WRITING_TUTOR_PROMPT } from "@/src/prompt/prompt.ts";
 import { LessonManager } from "./lessonManager.ts";
+import { CONFIG } from "@/src/config.ts";
 
 // Interface defining the structure of a feedback session between student and tutor
 export interface FeedbackSession {
@@ -100,7 +101,7 @@ export class WritingTutorService {
                 });
 
                 const response = await (this.anthropic as Anthropic).messages.create({
-                    model: "claude-3-5-sonnet-20241022",
+                    model: CONFIG.MODEL_NAME,
                     max_tokens: 4096,
                     temperature: 0.5,
                     system: prompt,
@@ -203,7 +204,7 @@ export class WritingTutorService {
                 });
 
                 const response = await (this.anthropic as Anthropic).messages.create({
-                    model: "claude-3-5-sonnet-20241022",
+                    model: CONFIG.MODEL_NAME,
                     max_tokens: 4096,
                     temperature: 0.5,
                     system: prompt,
@@ -256,7 +257,7 @@ export class WritingTutorService {
                 response = await (this.anthropic as MockAIClient).messages.create.call(this);
             } else {
                 response = await (this.anthropic as Anthropic).messages.create({
-                    model: "claude-3-5-sonnet-20241022",
+                    model: CONFIG.MODEL_NAME,
                     max_tokens: 1024,
                     temperature: 0.7,
                     messages: [
