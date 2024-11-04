@@ -77,5 +77,4 @@ export interface LessonPlannerResponse {
 // Error Response
 export interface ErrorResponse {
     error: string;
-    originalBody?: string;
 }

@@ -55,14 +55,6 @@ export class MockAIClient implements AIClient {
 
         return "Default mock response";
     }
-
-    getCallCount(): number {
-        return this.calls.length;
-    }
-
-    getLastPrompt(): string {
-        return this.calls[this.calls.length - 1];
-    }
 }
 
 class MockFunction {
@@ -93,14 +85,6 @@ class MockFunction {
         }
 
         return Promise.resolve(mockResponse.response);
-    }
-
-    toHaveBeenCalledWith(...args: any[]) {
-        return JSON.stringify(this.calls[this.calls.length - 1]) === JSON.stringify(args);
-    }
-
-    getCallCount(): number {
-        return this.calls.length;
     }
 }
 

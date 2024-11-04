@@ -46,9 +46,3 @@ if (!CONFIG.ANTHROPIC_API_KEY) {
     "ANTHROPIC_API_KEY is required. Please set it in your .env file or environment variables."
   );
 }
-
-export type { Config };
-
-export const IS_PRODUCTION = CONFIG.ENV === "production";
-export const IS_TEST = CONFIG.ENV === "test";
-export const IS_DEVELOPMENT = CONFIG.ENV === "development";

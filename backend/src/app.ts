@@ -73,7 +73,6 @@ app.use(async (ctx, next) => {
             // Optionally sanitize the response
             ctx.response.body = {
                 error: 'Invalid JSON response generated',
-                originalBody: String(body)
             };
         }
     }
