@@ -20,10 +20,6 @@ interface LessonPlan {
     };
 }
 
-// Define the structure of the parsed response
-interface ParsedResponse {
-    lessonPlans: LessonPlan[];
-}
 
 // Define possible result states
 type ResultState = LessonPlan[] | { error: string }[] | null;
@@ -51,8 +47,7 @@ const typeMessage = (message: string, setChat: React.Dispatch<React.SetStateActi
 
         // Take 2-4 words at a time randomly
         const chunkSize = Math.floor(Math.random() * 4) + 3;
-        const chunk = words.slice(currentIndex, currentIndex + chunkSize).join(' ') + ' ';
-
+        
         setChat(prev => {
             const newHistory = [...prev];
             const lastMessage = newHistory[newHistory.length - 1];
@@ -356,19 +351,23 @@ function App() {
                         <div className="lesson-plan">
                             {Array.isArray(result) ? (
                                 result.map((plan, index) => (
-                                    <div key={index} className="lesson-card">
-                                        <h4>Objective: {plan.lessonPlan.objective}</h4>
+                                    'error' in plan ? (
+                                        <div key={index} className="error-message">{plan.error}</div>
+                                    ) : (
+                                        <div key={index} className="lesson-card">
+                                            <h4>Objective: {plan.lessonPlan.objective}</h4>
 
-                                        <div>
-                                            <h4>Activities:</h4>
-                                            {plan.lessonPlan.activities.map((activity, idx) => (
-                                                <div key={idx} className="activity-card">
-                                                    <h5>Activity {activity.order}: {activity.name}</h5>
-                                                    <p>{activity.text}</p>
-                                                </div>
-                                            ))}
+                                            <div>
+                                                <h4>Activities:</h4>
+                                                {plan.lessonPlan.activities.map((activity, idx) => (
+                                                    <div key={idx} className="activity-card">
+                                                        <h5>Activity {activity.order}: {activity.name}</h5>
+                                                        <p>{activity.text}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
                                         </div>
-                                    </div>
+                                    )
                                 ))
                             ) : (
                                 <div>No lesson plan available</div>

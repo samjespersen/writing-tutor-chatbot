@@ -72,7 +72,7 @@ class MockFunction {
         this.mockResponses = [{ response: error, isError: true }];
     }
 
-    call(thisArg: any, ...args: any[]): Promise<any> {
+    call(_thisArg: any, ...args: any[]): Promise<any> {
         this.calls.push(args);
         const mockResponse = this.mockResponses[this.calls.length - 1] || this.mockResponses[0];
 

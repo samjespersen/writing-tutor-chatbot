@@ -4,8 +4,7 @@ import { load } from "@/deps.ts";
 interface Config {
   PORT: number;
   ANTHROPIC_API_KEY: string;
-  ENV: "development" | "production" | "test";
-  HOST: string;
+  MODEL_NAME: string;
 }
 
 const loadConfig = async (): Promise<Config> => {
@@ -19,22 +18,17 @@ const loadConfig = async (): Promise<Config> => {
     return {
       PORT: parseInt(env.PORT || "3000"),
       ANTHROPIC_API_KEY: env.ANTHROPIC_API_KEY,
-      ENV: (env.ENV as Config["ENV"]) || "development",
-      HOST: env.HOST || "localhost",
+      MODEL_NAME: env.MODEL_NAME || "claude-3-sonnet-20240229"
     };
   } catch (error: unknown) {
-    // Proper type checking for the error object
     if (error instanceof Error && error.message.includes("Cannot find .env file")) {
       console.warn("No .env file found, using default values and environment variables");
       return {
         PORT: parseInt(Deno.env.get("PORT") || "3000"),
         ANTHROPIC_API_KEY: Deno.env.get("ANTHROPIC_API_KEY") || "",
-        ENV: (Deno.env.get("ENV") as Config["ENV"]) || "development",
-        HOST: Deno.env.get("HOST") || "localhost",
+        MODEL_NAME: Deno.env.get("MODEL_NAME") || "claude-3-5-sonnet-20241022"
       };
     }
-    
-    // Re-throw other errors
     throw error;
   }
 };

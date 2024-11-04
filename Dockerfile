@@ -44,7 +44,7 @@ RUN bun install
 WORKDIR /usr/src/app
 RUN echo '#!/bin/bash\n\
 # Create .env file with runtime environment variable\n\
-echo "ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY\nPORT=3000\nHOST=0.0.0.0\nENV=development" > /usr/src/app/backend/.env\n\
+echo "ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY\nPORT=3000\nHOST=0.0.0.0\nENV=development\nMODEL_NAME=$MODEL_NAME" > /usr/src/app/backend/.env\n\
 # Start backend\n\
 cd /usr/src/app/backend && deno run --allow-net --allow-env --allow-read src/app.ts & \n\
 # Start frontend\n\

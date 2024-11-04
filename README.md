@@ -15,5 +15,7 @@ curl -fsSL https://deno.land/x/install/install.sh | sh
 ## Or, run a docker image
 ```bash
 docker build -t writing-tutor .
-docker run -p 3000:3000 -p 8000:8000 -e ANTHROPIC_API_KEY=<your_api_key_here> writing-tutor
+docker run -p 3000:3000 -p 8000:8000 -e ANTHROPIC_API_KEY=<your_api_key_here> 
+MODEL_NAME=<anthropic_model_here>
+writing-tutor
 ```

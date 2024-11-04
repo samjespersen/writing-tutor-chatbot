@@ -1,6 +1,7 @@
 import { Anthropic } from "npm:@anthropic-ai/sdk";
 import { CURRICULUM_DESIGNER_SYSTEM_PROMPT, CURRICULUM_DESIGNER_USER_PROMPT } from "@/src/prompt/prompt.ts";
 import { MockAIClient, mockLessonPlanResponse } from "@/src/test/mockAIClient.ts";
+import { CONFIG } from "@/src/config.ts";
 
 export class LessonPlanner {
     public anthropic: Anthropic | MockAIClient;
@@ -33,7 +34,7 @@ export class LessonPlanner {
             // @ts-ignore
             system: CURRICULUM_DESIGNER_SYSTEM_PROMPT,
             messages: [{ role: "user", content: userPrompt }],
-            model: "claude-3-5-sonnet-20241022",
+            model: CONFIG.MODEL_NAME,
             max_tokens: 4096,
             temperature: 0.5,
         });
