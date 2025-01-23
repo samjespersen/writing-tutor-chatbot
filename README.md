@@ -1,16 +1,6 @@
 # writing-tutor-chatbot
 A writing-tutor chatbot POC rapid-prototypes using Claude 3.5 via Cursor and Anthropic Workbench
 
-I had two main goals for this project:
-
-### 1. Build a proof of concept for prompt engineering AI agents to design and teach a writing lesson plan using real world educational resources.
-
-When I saw the fullstack position on the Apex Learning team at Eigen, I was immediately intrigued at the idea of combining software engineering, education, and AI. I read about the Alpha School and was fully on board. I have been looking for an opportunity to integrate my skills in education and pedagogy into my software engineering career, so this seemed like a great fit.
-
-### 2. Experiment with developing as "hands-off" as possible, relying on Claude 3.5 to do as much of the work as possible.
-
-I have used AI tooling in my everyday work as a fullstack engineer for a few years now, but I had yet to really do a deep dive into the possibilites. This project represents my first real attempt at a front-to-back implementation using AI.
-
 ## Key Takeaways
 
 #### On building with AI
