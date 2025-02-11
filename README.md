@@ -1,5 +1,5 @@
 # writing-tutor-chatbot
-A writing-tutor chatbot POC rapid-prototyped using Claude 3.5 via Cursor and Anthropic Workbench
+A writing-tutor chatbot POC rapid-prototyping experiment using Claude 3.5 via Cursor and Anthropic Workbench
 
 ## Background
 
