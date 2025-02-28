@@ -35,6 +35,8 @@ Once Claude spun up an initial barebones application, I copy-pasted it into a ne
 
 ## Results
 
+(Unfortunately, Cursor somehow lost my chat history for this project so I could not review the prompts I used. The following analysis is based on my memory and review of the commits)
+
 The persona in this experiment would be pretty pleased. From their perspective, they very quickly made a web application that uses AI to perform a complex task for very little cost. I spent between 8-10 hours running this experiment and spent less than 10 dollars (+ roughly 250 premium fast requests on Cursor) on it.
 
 The developer running the experiment (me) was less than pleased. While the speed at which you can generate large mostly-usefull codeblocks was sometimes intoxicating, it came at quite the cost. Some of the problems with this approach I took note of:
@@ -48,22 +50,3 @@ Interestingly, it never suggested using any advanced techniques that I as a deve
 ## Key takeaway
 
 I think that a lightly technical product person could pretty easily make a functioning web app prototype quickly and cheaply. Furthermore, with just a few hours from a developer, the quality of that app could be vastly improved more pointed and relevant prompts, and regular refactoring sessions to keep the code tight and clean.
-
-
-## To build locally:
-- Install bun and deno
-```bash
-curl -fsSL https://bun.sh/install | bash
-curl -fsSL https://deno.land/x/install/install.sh | sh
-```
-- Install dependencies
-- See `.env.example` for environment variables
-- Run backend first with `deno task start`
-- Run app next with `bun run dev`
-
-## Or, run a docker image
-```bash
-docker build -t writing-tutor .
-docker run -p 3000:3000 -p 8000:8000 -e ANTHROPIC_API_KEY=<your_api_key_here> -e MODEL_NAME=<anthropic_model_here> writing-tutor
-```
-The app will be available at `localhost:3000`.
